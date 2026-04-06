@@ -1,0 +1,68 @@
+description:
+    name: Basic Execution
+    level: 1
+agents:
+  - name: Avellaneda-Stoikov Trader
+    type: AvellanedaStoikovModel
+    count: 2
+    parameters:
+      - gamma: 0.1
+        k: 40.0
+        base_size: 200
+        sigma: 0.02
+        n_levels: 5
+      - gamma: 0.05
+        k: 60.0
+        base_size: 150
+        sigma: 0.02
+        n_levels: 5
+
+  - name: Fundamental Trader
+    type: FundamentalTrader
+    count: 2
+    parameters:
+      - fundamental: 100.0
+        threshold: 0.02
+        max_order: 100
+      - fundamental: 100.0
+        threshold: 0.05
+        max_order: 200
+
+  - name: Noise Trader
+    type: NoiseTrader
+    count: 8
+    parameters:
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+      - arrival_rate: 0.2
+        market_order_prob: 0.1
+        base_size: 10
+        sigma: 0.02
+
+

@@ -1,0 +1,103 @@
+description:
+  name: Flash Crash 
+  level: 4
+agents:
+  - name: Avellaneda-Stoikov
+    type: AvellanedaStoikovModel
+    count: 2
+    parameters:
+      - gamma: 0.01      # Ultra-aggressive. Will sit 0.01 ticks inside the agent.
+        k: 100.0         # Tighter than the spread itself. LLM is effectively front-run.
+        base_size: 500
+        sigma: 0.005     # Extreme precision.
+        n_levels: 5      # Occupies the entire top of the book.
+      - gamma: 0.01
+        k: 120.0
+        base_size: 300
+        sigma: 0.005
+        n_levels: 5
+
+  - name: Fundamental Chaos Traders
+    type: FundamentalTrader
+    count: 3
+    parameters:
+      - fundamental: 95.0 # Pulls the price down violently
+        threshold: 0.01  # Instant reaction
+        max_order: 2000  # Massive liquidation pressure
+      - fundamental: 105.0 # Pulls the price up violently (Whipsaw effect)
+        threshold: 0.01
+        max_order: 2000
+      - fundamental: 100.0
+        threshold: 0.005 # Hyper-sensitive mean reversion
+        max_order: 1500
+
+  - name: Predatory Noise Traders
+    type: NoiseTrader
+    count: 4 # Reduced count further. Fills are rare and usually at "the worst price."
+    parameters:
+      - arrival_rate: 1.0
+        market_order_prob: 0.95 # Almost always "taking" liquidity.
+        base_size: 100
+        sigma: 0.25
+      - arrival_rate: 1.0
+        market_order_prob: 0.95 # Almost always "taking" liquidity.
+        base_size: 100
+        sigma: 0.25
+      - arrival_rate: 1.0
+        market_order_prob: 0.95 # Almost always "taking" liquidity.
+        base_size: 100
+        sigma: 0.25
+      - arrival_rate: 1.0
+        market_order_prob: 0.95 # Almost always "taking" liquidity.
+        base_size: 100
+        sigma: 0.25
+
+  - name: Adversarial Selection Trader 
+    type: AdversarialSelectionTrader
+    count: 8 # Increased from 6
+    parameters:
+      # Tier 1: Massive Spoof "Walls" with Deep Icebergs
+      - base_size: 5000
+        spoof_size: 100000 # 100k Spoof units. Moves the mid-price instantly.
+        n_levels: 1       
+        iceberg_ratio: 0.01 # Shows 50 units, hides 4950. A total "Dark" wall.
+      
+      - base_size: 4000
+        spoof_size: 85000
+        n_levels: 1
+        iceberg_ratio: 0.02
+        
+      # Tier 2: Predator Layers (Creates "False Support")
+      - base_size: 3000
+        spoof_size: 75000
+        n_levels: 5       # Spreads the spoof so the book looks "thick" for miles.
+        iceberg_ratio: 0.03
+        
+      # Tier 3: Liquidity Vacuum (Cleans the book when the agent tries to exit)
+      - base_size: 6000
+        spoof_size: 150000 # The "Nuke." 
+        n_levels: 1
+        iceberg_ratio: 0.01
+      
+            # Tier 1: Massive Spoof "Walls" with Deep Icebergs
+      - base_size: 5000
+        spoof_size: 100000 # 100k Spoof units. Moves the mid-price instantly.
+        n_levels: 1       
+        iceberg_ratio: 0.01 # Shows 50 units, hides 4950. A total "Dark" wall.
+      
+      - base_size: 4000
+        spoof_size: 85000
+        n_levels: 1
+        iceberg_ratio: 0.02
+        
+      # Tier 2: Predator Layers (Creates "False Support")
+      - base_size: 3000
+        spoof_size: 75000
+        n_levels: 5       # Spreads the spoof so the book looks "thick" for miles.
+        iceberg_ratio: 0.03
+        
+      # Tier 3: Liquidity Vacuum (Cleans the book when the agent tries to exit)
+      - base_size: 6000
+        spoof_size: 150000 # The "Nuke." 
+        n_levels: 1
+        iceberg_ratio: 0.01

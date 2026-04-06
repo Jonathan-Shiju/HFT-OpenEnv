@@ -1,0 +1,93 @@
+description:
+  name: Conflicting Signals
+  level: 3
+agents:
+  - name: Avellaneda-Stoikov Trader
+    type: AvellanedaStoikovModel
+    count: 2
+    parameters:
+      - gamma: 0.05      # Tightened from 0.2 (More aggressive than Level 2)
+        k: 60.0          # Higher K = Tighter spreads
+        base_size: 200
+        sigma: 0.015
+        n_levels: 5
+      - gamma: 0.08
+        k: 55.0
+        base_size: 150
+        sigma: 0.02
+        n_levels: 5
+
+  - name: Fundamental Trader
+    type: FundamentalTrader
+    count: 3
+    parameters:
+      - fundamental: 100.0
+        threshold: 0.02  # Lowered from 0.05 to keep price pinned (Harder to get edge)
+        max_order: 300
+      - fundamental: 100.0
+        threshold: 0.04
+        max_order: 500
+      - fundamental: 100.0
+        threshold: 0.08
+        max_order: 800
+
+  - name: Noise Trader
+    type: NoiseTrader
+    count: 8             # Reduced from 14 to limit "Easy" fills
+    parameters:
+      - arrival_rate: 0.25 # Lowered from 0.5 (Less organic liquidity than Level 2)
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25 # Lowered from 0.5 (Less organic liquidity than Level 2)
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25 # Lowered from 0.5 (Less organic liquidity than Level 2)
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25 # Lowered from 0.5 (Less organic liquidity than Level 2)
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+      - arrival_rate: 0.25
+        market_order_prob: 0.15
+        base_size: 25
+        sigma: 0.05
+
+  - name: Adversarial Selection Trader
+    type: AdversarialSelectionTrader
+    count: 4             # Increased from 3
+    parameters:
+      - base_size: 400
+        spoof_size: 6000 
+        n_levels: 1
+        iceberg_ratio: 0.15 # Less visible than Level 2
+
+      - base_size: 600
+        spoof_size: 9000
+        n_levels: 3
+        iceberg_ratio: 0.2
+
+      - base_size: 300
+        spoof_size: 15000   # Escalated spoof size
+        n_levels: 1
+        iceberg_ratio: 0.08 # Very hidden
+
+      - base_size: 300
+        spoof_size: 15000   # Escalated spoof size
+        n_levels: 1
+        iceberg_ratio: 0.08 # Very hidden

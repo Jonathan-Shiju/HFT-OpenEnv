@@ -1,0 +1,102 @@
+description:
+  name: False Signal
+  level: 2
+agents:
+  - name: Avellaneda-Stoikov Trader
+    type: AvellanedaStoikovModel
+    count: 2
+    parameters:
+      - gamma: 0.1
+        k: 40.0
+        base_size: 200
+        sigma: 0.02
+        n_levels: 5
+      - gamma: 0.05
+        k: 60.0
+        base_size: 150
+        sigma: 0.02
+        n_levels: 5
+
+  - name: Fundamental Trader
+    type: FundamentalTrader
+    count: 3
+    parameters:
+      - fundamental: 100.0
+        threshold: 0.02
+        max_order: 100
+      - fundamental: 100.0
+        threshold: 0.05
+        max_order: 200
+      - fundamental: 100.0
+        threshold: 0.10
+        max_order: 400
+
+  - name: Noise Trader
+    type: NoiseTrader
+    count: 12
+    parameters:
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      - arrival_rate: 0.35
+        market_order_prob: 0.2
+        base_size: 20
+        sigma: 0.03
+      
+
+  - name: Adversarial Selection Trader
+    type: AdversarialSelectionTrader
+    count: 2 # Doubled to create a "pincer" effect on both sides of the book
+    parameters:
+      # Tier 1: The "Small Fisher"
+      - base_size: 150
+        spoof_size: 2500     # Enough to move the best bid/ask by 1-2 ticks
+        n_levels: 1
+        iceberg_ratio: 0.5   # Half the order is visible. Very fair.
+
+      # Tier 2: The "Spread Tightener"
+      - base_size: 100
+        spoof_size: 1500
+        n_levels: 2          # Distributes size to look like a thick spread
+        iceberg_ratio: 0.7   # Mostly visible (70 units shown, 30 hidden)
