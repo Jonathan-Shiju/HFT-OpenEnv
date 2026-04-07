@@ -32,7 +32,9 @@ load_dotenv()
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+LOCAL_IMAGE_NAME = os.getenv(
+    "LOCAL_IMAGE_NAME", "ghcr.io/jonathan-shiju/hft-env:latest"
+)
 BENCHMARK = os.getenv("BENCHMARK", "hft")
 TASK_NAME = os.getenv("TASK", "flash_crash")
 VERBOSE = os.getenv("VERBOSE", "false")
