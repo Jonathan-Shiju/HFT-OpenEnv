@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import asdict, dataclass
-from pydantic import BaseModel
 import websockets
 import httpx
 import argparse, asyncio, json, os, sys
@@ -9,13 +8,13 @@ from openai import AsyncOpenAI
 import re
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-try:
-    from models import HftAction, HftObservation, tasks
-except ModuleNotFoundError:
-    from hft.models import HftAction, HftObservation, tasks
-
 
 try:
+    try:
+        from models import HftAction, HftObservation, tasks
+    except ModuleNotFoundError:
+        from hft.models import HftAction, HftObservation, tasks
+
     from openenv.core.env_server.http_server import (
         WSErrorResponse,
         WSObservationResponse,
@@ -24,15 +23,18 @@ try:
 
 except Exception as e:  # pragma: no cover
     raise ImportError(
-        "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
+        "Required modules not found. Ensure you have installed dependencies with '\n    uv sync\n'"
     ) from e
 
 
 load_dotenv()
 
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+BENCHMARK = os.getenv("BENCHMARK", "hft")
+TASK_NAME = os.getenv("TASK", "flash_crash")
 VERBOSE = os.getenv("VERBOSE", "false")
 
 
@@ -109,7 +111,28 @@ class WebSocketError(Exception):
 def log_transcript(message: str) -> None:
     global _transcript
     _transcript += f"{message}\n"
-    print(message, flush=True)
+    print(message, file=sys.stderr, flush=True)
+
+
+def log_start(task: str, benchmark: str, model: str) -> None:
+    print(f"[START] task={task} env={benchmark} model={model}", flush=True)
+
+
+def log_step(
+    step: int, action: str, reward: float, done: bool, error: Optional[str]
+) -> None:
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error=null",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    rewards_value = ",".join(f"{reward:.2f}" for reward in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_value}",
+        flush=True,
+    )
 
 
 def validate_task_name(task: str) -> None:
@@ -213,6 +236,24 @@ async def run_episode_loop(
         actions = await call_llm_for_actions(client, user_prompt)
         action_payload = actions_to_hft_action(actions)
         observation = await step_fn(action_payload)
+        step_reward = None
+        step_done = False
+        if isinstance(observation, dict):
+            step_reward = observation.get("reward")
+            step_done = observation.get("done", False)
+        else:
+            step_reward = getattr(observation, "reward", None)
+            step_done = getattr(observation, "done", False)
+
+        log_step(
+            step=len(_rewards[task]) + 1,
+            action=json.dumps(
+                action_payload.model_dump(exclude_none=True), separators=(",", ":")
+            ),
+            reward=float(step_reward or 0.0),
+            done=bool(step_done),
+            error=None,
+        )
         if not isinstance(observation, dict):
             observation = asdict(observation)["observation"].model_dump()
             observation, user_prompt = build_user_prompt(observation)
@@ -395,7 +436,7 @@ async def health_check(http_url: str) -> bool:
             response = await client.get(f"{http_url}/health")
             return response.status_code == 200
         except Exception as e:
-            print(f"Health check failed: {e}")
+            print(f"Health check failed: {e}", file=sys.stderr)
             return False
 
 
@@ -407,11 +448,14 @@ async def run_docker_task(
     try:
         for task in tasks:
             env = None
+            episode_score = 0.0
+            episode_steps = 0
+            episode_success = False
             validate_task_name(task)
-            log_transcript(f"Running task: {task}")
+            log_start(task=task, benchmark=BENCHMARK, model=MODEL_NAME)
             try:
                 env = await HftEnv.from_docker_image(
-                    "ghcr.io/jonathan-shiju/hft-env:latest",
+                    LOCAL_IMAGE_NAME,
                     env_vars={
                         "TASK": task,
                         **hftParams.to_env_dict(),
@@ -439,10 +483,26 @@ async def run_docker_task(
                 log_transcript(
                     f"Episode finished for task: {task}, Reward: {_rewards_avg[task]}"
                 )
+                episode_score = min(max(_rewards_avg[task], 0.0), 1.0)
+                episode_steps = len(_rewards[task])
+                episode_success = episode_score > 0.0
                 await asyncio.sleep(pause)
             finally:
-                if env is not None:
-                    await env.close()
+                try:
+                    if env is not None:
+                        await env.close()
+                finally:
+                    if episode_steps == 0:
+                        episode_steps = len(_rewards[task])
+                    if episode_score == 0.0 and _rewards[task]:
+                        episode_score = min(max(_rewards_avg[task], 0.0), 1.0)
+                        episode_success = episode_score > 0.0
+                    log_end(
+                        success=episode_success,
+                        steps=episode_steps,
+                        score=episode_score,
+                        rewards=_rewards[task],
+                    )
         log_transcript("All tasks completed.")
     except Exception as e:
         log_transcript(f"Error running Docker task: {e}")
@@ -464,6 +524,9 @@ async def check_ws_error(
 async def run_online_single_task(
     client: AsyncOpenAI, task: str, params: HftParams, base_url: str
 ):
+    episode_score = 0.0
+    episode_steps = 0
+    episode_success = False
     async with websockets.connect(
         uri=f"wss://{base_url.lstrip('https://')}/ws"
     ) as websocket:
@@ -527,12 +590,27 @@ async def run_online_single_task(
             log_transcript(
                 f"Episode finished for task: {task}, Reward: {_rewards_avg[task]}"
             )
+            episode_score = min(max(_rewards_avg[task], 0.0), 1.0)
+            episode_steps = len(_rewards[task])
+            episode_success = episode_score > 0.0
         except WebSocketError as e:
             log_transcript(f"WebSocket error: {e}")
             sys.exit(1)
         except Exception as e:
             log_transcript(f"Error during WebSocket interaction: {e}")
             sys.exit(1)
+        finally:
+            if episode_steps == 0:
+                episode_steps = len(_rewards[task])
+            if episode_score == 0.0 and _rewards[task]:
+                episode_score = min(max(_rewards_avg[task], 0.0), 1.0)
+                episode_success = episode_score > 0.0
+            log_end(
+                success=episode_success,
+                steps=episode_steps,
+                score=episode_score,
+                rewards=_rewards[task],
+            )
 
 
 async def run_online_tasks(
@@ -540,8 +618,15 @@ async def run_online_tasks(
 ):
     for task in tasks:
         validate_task_name(task)
-        log_transcript(f"Running task: {task}")
+        log_start(task=task, benchmark=BENCHMARK, model=MODEL_NAME)
         await run_online_single_task(client, task, params, base_url)
+        score = min(max(_rewards_avg[task], 0.0), 1.0)
+        log_end(
+            success=score > 0.0,
+            steps=len(_rewards[task]),
+            score=score,
+            rewards=_rewards[task],
+        )
         await asyncio.sleep(pause)
 
 
@@ -641,13 +726,13 @@ async def main():
         else ["basic_execution", "false_signal", "conflicting_signal", "flash_crash"]
     )
 
-    if not API_KEY and not API_BASE_URL:
-        raise ValueError("API_KEY and API_BASE_URL must be set when VERBOSE is True")
+    if not HF_TOKEN and not API_BASE_URL:
+        raise ValueError("HF_TOKEN and API_BASE_URL must be set when VERBOSE is True")
 
     try:
-        client = AsyncOpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        client = AsyncOpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     except Exception as e:
-        print(f"Error initializing OpenAI client: {e}")
+        print(f"Error initializing OpenAI client: {e}", file=sys.stderr)
         sys.exit(1)
 
     await run_task(client, tasks_to_run, args.pause, args, args.base_url)
@@ -664,4 +749,20 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        import traceback
+
+        error_msg = f"CRITICAL FAILURE: {str(e)}"
+        print("=" * 40)
+        print(error_msg)
+        print("TRACEBACK:")
+        traceback.print_exc()
+        print("=" * 40)
+
+        with open("error_log.txt", "w") as f:
+            f.write(error_msg + "\n")
+            traceback.print_factory(file=f)
+
+        sys.exit(1)
