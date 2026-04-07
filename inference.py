@@ -8,13 +8,13 @@ from openai import AsyncOpenAI
 import re
 from typing import Any, Awaitable, Callable, Dict, Optional
 
+try:
+    from models import HftAction, HftObservation, tasks
+except ModuleNotFoundError:
+    from hft.models import HftAction, HftObservation, tasks
+
 
 try:
-    try:
-        from models import HftAction, HftObservation, tasks
-    except ModuleNotFoundError:
-        from hft.models import HftAction, HftObservation, tasks
-
     from openenv.core.env_server.http_server import (
         WSErrorResponse,
         WSObservationResponse,
@@ -23,7 +23,7 @@ try:
 
 except Exception as e:  # pragma: no cover
     raise ImportError(
-        "Required modules not found. Ensure you have installed dependencies with '\n    uv sync\n'"
+        "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
     ) from e
 
 
@@ -751,20 +751,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        import traceback
-
-        error_msg = f"CRITICAL FAILURE: {str(e)}"
-        print("=" * 40)
-        print(error_msg)
-        print("TRACEBACK:")
-        traceback.print_exc()
-        print("=" * 40)
-
-        with open("error_log.txt", "w") as f:
-            f.write(error_msg + "\n")
-            traceback.print_factory(file=f)
-
-        sys.exit(1)
+    asyncio.run(main())
